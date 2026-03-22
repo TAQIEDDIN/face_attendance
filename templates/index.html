@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Attendance — Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<!-- TOP BAR -->
+<header class="topbar">
+    <div class="topbar-left">
+        <div class="app-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/>
+                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+        </div>
+        <span class="app-name">Face Attendance</span>
+        <span class="app-version">v2.0</span>
+    </div>
+    <div class="topbar-center">
+        <div class="tb-stat">
+            <span class="tb-label">DATE</span>
+            <span class="tb-value" id="tb-date">--/--/----</span>
+        </div>
+        <div class="tb-divider"></div>
+        <div class="tb-stat">
+            <span class="tb-label">TIME</span>
+            <span class="tb-value mono" id="tb-clock">--:--:--</span>
+        </div>
+    </div>
+    <div class="topbar-right">
+        <div class="tb-pill" id="pill-cam"><span class="pill-dot"></span><span id="pill-cam-txt">Camera</span></div>
+        <div class="tb-pill" id="pill-rec"><span class="pill-dot"></span><span id="pill-rec-txt">Recognizer</span></div>
+        <div class="tb-pill" id="pill-db"><span class="pill-dot"></span><span id="pill-db-txt">Database</span></div>
+        <button class="btn-add-employee" onclick="openEnrollModal()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+            Add Employee
+        </button>
+    </div>
+</header>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+    <!-- LEFT -->
+    <aside class="left-col">
+        <div class="card camera-card">
+            <div class="card-header">
+                <div class="card-title"><span class="ch-dot green"></span>Live Camera</div>
+                <div class="cam-meta">
+                    <span class="rec-badge">● REC</span>
+                    <span class="cam-id">CAM-01</span>
+                </div>
+            </div>
+            <div class="camera-wrap">
+                <img src="/video_feed" alt="Live Feed" class="cam-img">
+                <div class="cam-hud">
+                    <span class="hud-loc">📍 ENTRANCE</span>
+                    <span class="hud-ts" id="hud-ts">--:--:--</span>
+                </div>
+                <div class="cam-corner c-tl"></div>
+                <div class="cam-corner c-tr"></div>
+                <div class="cam-corner c-bl"></div>
+                <div class="cam-corner c-br"></div>
+            </div>
+        </div>
+
+        <div class="card personnel-card">
+            <div class="card-header">
+                <div class="card-title">Personnel Status</div>
+                <span class="badge-count">{{ status|length }}</span>
+            </div>
+            <div class="person-list">
+                {% for name, event in status.items() %}
+                <div class="person-item {% if event == 'check-in' %}p-in{% else %}p-out{% endif %}">
+                    <div class="p-avatar {% if event == 'check-in' %}av-in{% else %}av-out{% endif %}">{{ name[0].upper() }}</div>
+                    <div class="p-details">
+                        <div class="p-name">{{ name }}</div>
+                        <div class="p-status">
+                            {% if event == 'check-in' %}
+                                <span class="s-dot s-green"></span> Inside
+                            {% else %}
+                                <span class="s-dot s-red"></span> Outside
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="p-tag {% if event == 'check-in' %}tag-in{% else %}tag-out{% endif %}">
+                        {% if event == 'check-in' %}IN{% else %}OUT{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </aside>
+
+    <!-- CENTER -->
+    <main class="center-col">
+
+        <div class="stats-row">
+            <div class="stat-box">
+                <div class="stat-ico enrolled">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-n" id="s-enrolled">{{ stats.total_enrolled }}</div>
+                    <div class="stat-l">Enrolled</div>
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-ico inside">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-n green">{{ stats.currently_in }}</div>
+                    <div class="stat-l">Inside</div>
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-ico outside">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-n">{{ stats.currently_out }}</div>
+                    <div class="stat-l">Outside</div>
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-ico unknown">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-n amber">{{ stats.unknown_today }}</div>
+                    <div class="stat-l">Unknown Today</div>
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-ico events">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-n blue">{{ stats.events_today }}</div>
+                    <div class="stat-l">Events Today</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DIAGNOSTICS -->
+        <div class="card diag-card">
+            <div class="card-header">
+                <div class="card-title">System Diagnostics</div>
+                <span class="mono small" id="diag-ts">--:--:--</span>
+            </div>
+            <div class="diag-body">
+                <div class="diag-col">
+                    <div class="diag-section-title">Services</div>
+                    <div class="diag-row">
+                        <div class="diag-left"><div class="diag-dot" id="sd-cam"></div><span>Camera</span></div>
+                        <span class="diag-status-tag" id="st-cam">—</span>
+                    </div>
+                    <div class="diag-row">
+                        <div class="diag-left"><div class="diag-dot" id="sd-rec"></div><span>Face Detection</span></div>
+                        <div class="diag-right">
+                            <span class="diag-status-tag" id="st-rec">—</span>
+                            <span class="diag-sub" id="ss-rec"></span>
+                        </div>
+                    </div>
+                    <div class="diag-row">
+                        <div class="diag-left"><div class="diag-dot" id="sd-db"></div><span>Database</span></div>
+                        <div class="diag-right">
+                            <span class="diag-status-tag" id="st-db">—</span>
+                            <span class="diag-sub" id="ss-db"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="diag-col">
+                    <div class="diag-section-title">Image Storage</div>
+                    <div class="diag-row storage-row">
+                        <div class="diag-left">
+                            <div class="diag-dot dot-blue" id="sd-cin"></div>
+                            <div><div>Check-In Images</div><div class="path-label">data/events/check_in/</div></div>
+                        </div>
+                        <div class="diag-right">
+                            <span class="count-badge" id="cnt-cin">--</span>
+                            <span class="diag-sub" id="last-cin">--</span>
+                        </div>
+                    </div>
+                    <div class="diag-row storage-row">
+                        <div class="diag-left">
+                            <div class="diag-dot dot-red" id="sd-cout"></div>
+                            <div><div>Check-Out Images</div><div class="path-label">data/events/check_out/</div></div>
+                        </div>
+                        <div class="diag-right">
+                            <span class="count-badge" id="cnt-cout">--</span>
+                            <span class="diag-sub" id="last-cout">--</span>
+                        </div>
+                    </div>
+                    <div class="diag-row storage-row">
+                        <div class="diag-left">
+                            <div class="diag-dot dot-amber" id="sd-unk"></div>
+                            <div><div>Unknown Images</div><div class="path-label">data/unknown/</div></div>
+                        </div>
+                        <div class="diag-right">
+                            <span class="count-badge" id="cnt-unk">--</span>
+                            <span class="diag-sub" id="last-unk">--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="diag-col feed-col">
+                    <div class="diag-section-title">Event Feed</div>
+                    <div class="live-feed" id="live-feed"><div class="feed-empty">No events yet...</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CHARTS -->
+        <div class="charts-row">
+            <div class="card chart-card-bar">
+                <div class="card-header"><div class="card-title">Activity — Last 12 Hours</div></div>
+                <div class="chart-area"><canvas id="barChart"></canvas></div>
+            </div>
+            <div class="card chart-card-donut">
+                <div class="card-header"><div class="card-title">In / Out Ratio</div></div>
+                <div class="chart-area donut-area">
+                    <canvas id="donutChart"></canvas>
+                    <div class="donut-center">
+                        <div class="dc-pct" id="inPct">--%</div>
+                        <div class="dc-lbl">Inside</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TABLE -->
+        <div class="card table-card">
+            <div class="card-header">
+                <div class="card-title">Recent Events</div>
+                <span class="badge-count">Last 50</span>
+            </div>
+            <div class="table-wrap">
+                <table class="ev-table">
+                    <thead><tr><th style="width:48px">#</th><th>Employee</th><th>Timestamp</th><th>Event</th></tr></thead>
+                    <tbody>
+                        {% for row in data %}
+                        <tr>
+                            <td class="t-num">{{ loop.index }}</td>
+                            <td class="t-name">{{ row[0] }}</td>
+                            <td class="t-time mono">{{ row[1] }}</td>
+                            <td>
+                                <span class="ev-tag {% if row[2] == 'check-in' %}ev-in{% else %}ev-out{% endif %}">
+                                    {% if row[2] == 'check-in' %}↑ Check-In{% else %}↓ Check-Out{% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     ADD EMPLOYEE MODAL
+════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="enrollBackdrop" onclick="closeEnrollModal(event)">
+    <div class="modal" id="enrollModal">
+
+        <div class="modal-header">
+            <div class="modal-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/>
+                    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M19 3v6M22 6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Add New Employee
+            </div>
+            <button class="modal-close" onclick="closeEnrollModal()">✕</button>
+        </div>
+
+        <!-- STEP 1: Form -->
+        <div class="modal-body" id="step-form">
+
+            <div class="form-group">
+                <label class="form-label">Employee Name <span class="req">*</span></label>
+                <input type="text" class="form-input" id="enroll-name"
+                       placeholder="e.g. taki, yassin..." autocomplete="off">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    Photos
+                    <span class="form-hint">3–10 photos recommended for better accuracy</span>
+                </label>
+                <div class="drop-zone" id="dropZone"
+                     onclick="document.getElementById('fileInput').click()"
+                     ondragover="onDragOver(event)"
+                     ondragleave="onDragLeave(event)"
+                     ondrop="onDrop(event)">
+                    <input type="file" id="fileInput" multiple accept="image/*"
+                           style="display:none" onchange="onFilePick(event)">
+                    <div class="dz-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="dz-text">Click or drag photos here</div>
+                    <div class="dz-sub">JPG, PNG, WEBP — front-facing, good lighting</div>
+                </div>
+                <!-- Preview grid -->
+                <div class="preview-grid" id="previewGrid"></div>
+            </div>
+
+            <div class="form-tip">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                Use clear, well-lit, front-facing photos. Multiple angles improve accuracy.
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeEnrollModal()">Cancel</button>
+                <button class="btn-enroll" id="enrollBtn" onclick="submitEnroll()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Enroll Employee
+                </button>
+            </div>
+        </div>
+
+        <!-- STEP 2: Loading -->
+        <div class="modal-body" id="step-loading" style="display:none">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <div class="loading-title">Processing...</div>
+                <div class="loading-sub" id="loading-msg">Uploading images</div>
+                <div class="progress-bar-wrap">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 3: Result -->
+        <div class="modal-body" id="step-result" style="display:none">
+            <div class="result-state" id="result-state">
+                <!-- filled by JS -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-enroll" onclick="resetModal()">Enroll Another</button>
+                <button class="btn-cancel" onclick="closeEnrollModal(); location.reload()">Close & Refresh</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     SCRIPTS
+════════════════════════════════════════════ -->
+<script>
+// ── Clock ──
+function tick() {
+    const n = new Date();
+    document.getElementById('tb-clock').textContent = n.toTimeString().slice(0,8);
+    document.getElementById('tb-date').textContent  = n.toLocaleDateString('en-GB');
+    document.getElementById('hud-ts').textContent   = n.toTimeString().slice(0,8);
+}
+setInterval(tick, 1000); tick();
+
+// ── Charts ──
+const hourlyLabels = {{ hourly_labels | tojson | safe }};
+const hourlyIn     = {{ hourly_in     | tojson | safe }};
+const hourlyOut    = {{ hourly_out    | tojson | safe }};
+const totalIn      = {{ stats.currently_in  | default(0) }};
+const totalOut     = {{ stats.currently_out | default(0) }};
+
+Chart.defaults.font.family = 'Inter';
+Chart.defaults.color       = '#94a3b8';
+
+new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+        labels: hourlyLabels,
+        datasets: [
+            { label:'Check-In',  data:hourlyIn,  backgroundColor:'rgba(34,197,94,0.65)',
+              borderColor:'rgba(34,197,94,0.9)', borderWidth:1, borderRadius:3 },
+            { label:'Check-Out', data:hourlyOut, backgroundColor:'rgba(239,68,68,0.65)',
+              borderColor:'rgba(239,68,68,0.9)', borderWidth:1, borderRadius:3 }
+        ]
+    },
+    options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ labels:{ boxWidth:12, padding:16, font:{size:12} } } },
+        scales:{
+            x:{ grid:{ color:'rgba(255,255,255,0.04)' }, ticks:{ font:{size:11} } },
+            y:{ grid:{ color:'rgba(255,255,255,0.06)' }, ticks:{ stepSize:1 }, beginAtZero:true }
+        }
+    }
+});
+
+const t = totalIn + totalOut || 1;
+document.getElementById('inPct').textContent = Math.round(totalIn/t*100) + '%';
+new Chart(document.getElementById('donutChart'), {
+    type:'doughnut',
+    data:{
+        labels:['Inside','Outside'],
+        datasets:[{ data:[totalIn||0,totalOut||0],
+                    backgroundColor:['rgba(34,197,94,0.8)','rgba(239,68,68,0.8)'],
+                    borderColor:['rgb(34,197,94)','rgb(239,68,68)'],
+                    borderWidth:2, hoverOffset:6 }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'70%',
+              plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, padding:16 } } } }
+});
+
+// ── Diagnostics ──
+const feedLog = [];
+let _lastDbCount = null;
+
+function ago(s) {
+    if (s==null) return 'never';
+    if (s<60)    return s+'s ago';
+    if (s<3600)  return Math.round(s/60)+'m ago';
+    return Math.round(s/3600)+'h ago';
+}
+function setDot(id,cls){ const e=document.getElementById(id); if(e) e.className='diag-dot '+cls; }
+function setTag(id,text,ok){
+    const e=document.getElementById(id);
+    if(!e) return;
+    e.textContent=text;
+    e.className='diag-status-tag '+(ok?'tag-ok':'tag-err');
+}
+function setText(id,t){ const e=document.getElementById(id); if(e) e.textContent=t; }
+function setPill(pid,tid,text,ok){
+    const p=document.getElementById(pid), t=document.getElementById(tid);
+    if(!p||!t) return;
+    p.className='tb-pill '+(ok?'pill-ok':'pill-err');
+    t.textContent=text;
+}
+function addFeed(text,type){
+    const ts=new Date().toLocaleTimeString('en-GB');
+    feedLog.unshift({text,type,ts});
+    if(feedLog.length>8) feedLog.pop();
+    document.getElementById('live-feed').innerHTML=
+        feedLog.map(e=>`<div class="feed-item fi-${e.type}">
+            <span class="fi-ts">${e.ts}</span>
+            <span class="fi-msg">${e.text}</span></div>`).join('');
+}
+
+async function poll(){
+    try {
+        const d = await (await fetch('/api/status')).json();
+        setText('diag-ts', d.ts);
+        setDot('sd-cam', d.camera.ok?'dot-ok':'dot-err');
+        setTag('st-cam', d.camera.label, d.camera.ok);
+        setPill('pill-cam','pill-cam-txt', d.camera.ok?'Camera Online':'Camera Offline', d.camera.ok);
+        setDot('sd-rec', d.recognizer.ok?'dot-ok':'dot-err');
+        setTag('st-rec', d.recognizer.label, d.recognizer.ok);
+        setText('ss-rec', d.recognizer.seconds_ago!=null?'heartbeat '+ago(d.recognizer.seconds_ago):'no heartbeat');
+        setPill('pill-rec','pill-rec-txt', d.recognizer.ok?'Detection Active':'Detection Offline', d.recognizer.ok);
+        setDot('sd-db', d.database.ok?'dot-ok':'dot-err');
+        setTag('st-db', d.database.label, d.database.ok);
+        setText('ss-db', d.database.events_today+' events today');
+        setPill('pill-db','pill-db-txt', d.database.ok?'DB Online':'DB Error', d.database.ok);
+        const im=d.images;
+        setDot('sd-cin',  im.checkin.count>0?'dot-green':'dot-dim');
+        setDot('sd-cout', im.checkout.count>0?'dot-red':'dot-dim');
+        setDot('sd-unk',  im.unknown.count>0?'dot-amber':'dot-dim');
+        setText('cnt-cin',  im.checkin.count+' imgs/1h');
+        setText('cnt-cout', im.checkout.count+' imgs/1h');
+        setText('cnt-unk',  im.unknown.count+' imgs/1h');
+        setText('last-cin',  'last: '+ago(im.checkin.last_sec));
+        setText('last-cout', 'last: '+ago(im.checkout.last_sec));
+        setText('last-unk',  'last: '+ago(im.unknown.last_sec));
+        if(_lastDbCount!==null && d.database.events_today>_lastDbCount)
+            addFeed(`+${d.database.events_today-_lastDbCount} new event(s) in DB`,'info');
+        _lastDbCount=d.database.events_today;
+    } catch(e){}
+}
+poll(); setInterval(poll,3000);
+setTimeout(()=>location.reload(),30000);
+
+
+// ══════════════════════════════════════════
+// ENROLL MODAL
+// ══════════════════════════════════════════
+let selectedFiles = [];
+
+function openEnrollModal(){
+    document.getElementById('enrollBackdrop').classList.add('open');
+    document.body.style.overflow='hidden';
+    setTimeout(()=>document.getElementById('enroll-name').focus(), 100);
+}
+
+function closeEnrollModal(e){
+    if(e && e.target !== document.getElementById('enrollBackdrop')) return;
+    document.getElementById('enrollBackdrop').classList.remove('open');
+    document.body.style.overflow='';
+}
+
+function resetModal(){
+    selectedFiles=[];
+    document.getElementById('enroll-name').value='';
+    document.getElementById('previewGrid').innerHTML='';
+    document.getElementById('fileInput').value='';
+    updateDropZone();
+    showStep('form');
+}
+
+function showStep(name){
+    ['form','loading','result'].forEach(s=>{
+        document.getElementById('step-'+s).style.display = (s===name?'block':'none');
+    });
+}
+
+// ── Drag & Drop ──
+function onDragOver(e){
+    e.preventDefault();
+    document.getElementById('dropZone').classList.add('dz-hover');
+}
+function onDragLeave(e){
+    document.getElementById('dropZone').classList.remove('dz-hover');
+}
+function onDrop(e){
+    e.preventDefault();
+    document.getElementById('dropZone').classList.remove('dz-hover');
+    addFiles([...e.dataTransfer.files]);
+}
+function onFilePick(e){
+    addFiles([...e.target.files]);
+}
+
+function addFiles(newFiles){
+    const valid = newFiles.filter(f=>f.type.startsWith('image/'));
+    selectedFiles = [...selectedFiles, ...valid];
+    renderPreviews();
+    updateDropZone();
+}
+
+function removeFile(idx){
+    selectedFiles.splice(idx,1);
+    renderPreviews();
+    updateDropZone();
+}
+
+function renderPreviews(){
+    const grid = document.getElementById('previewGrid');
+    grid.innerHTML = selectedFiles.map((f,i) => {
+        const url = URL.createObjectURL(f);
+        return `<div class="preview-item">
+            <img src="${url}" alt="${f.name}">
+            <button class="preview-remove" onclick="removeFile(${i})">✕</button>
+            <div class="preview-name">${f.name.slice(0,16)}</div>
+        </div>`;
+    }).join('');
+}
+
+function updateDropZone(){
+    const dz = document.getElementById('dropZone');
+    if(selectedFiles.length>0){
+        dz.querySelector('.dz-text').textContent = selectedFiles.length+' photo(s) selected';
+        dz.querySelector('.dz-sub').textContent  = 'Click to add more';
+    } else {
+        dz.querySelector('.dz-text').textContent = 'Click or drag photos here';
+        dz.querySelector('.dz-sub').textContent  = 'JPG, PNG, WEBP — front-facing, good lighting';
+    }
+}
+
+// ── Submit ──
+async function submitEnroll(){
+    const name = document.getElementById('enroll-name').value.trim();
+    if(!name){
+        document.getElementById('enroll-name').focus();
+        document.getElementById('enroll-name').classList.add('input-error');
+        setTimeout(()=>document.getElementById('enroll-name').classList.remove('input-error'), 1000);
+        return;
+    }
+    if(selectedFiles.length===0){
+        document.getElementById('dropZone').classList.add('dz-error');
+        setTimeout(()=>document.getElementById('dropZone').classList.remove('dz-error'), 1000);
+        return;
+    }
+
+    showStep('loading');
+    setText('loading-msg','Uploading '+selectedFiles.length+' image(s)...');
+    animateProgress(20, 500);
+
+    const fd = new FormData();
+    fd.append('name', name);
+    selectedFiles.forEach(f=>fd.append('images', f));
+
+    try {
+        animateProgress(60, 1500);
+        setText('loading-msg','Detecting faces with InsightFace...');
+        const res  = await fetch('/api/enroll', { method:'POST', body:fd });
+        const data = await res.json();
+        animateProgress(100, 300);
+
+        setTimeout(()=>{
+            showStep('result');
+            showResult(data, name);
+        }, 400);
+
+    } catch(err){
+        showStep('result');
+        showResult({ok:false, error:'Network error: '+err.message}, name);
+    }
+}
+
+function animateProgress(target, dur){
+    const bar  = document.getElementById('progress-bar');
+    const cur  = parseFloat(bar.style.width)||0;
+    const step = (target-cur)/(dur/50);
+    let   val  = cur;
+    const iv   = setInterval(()=>{
+        val = Math.min(val+step, target);
+        bar.style.width = val+'%';
+        if(val>=target) clearInterval(iv);
+    }, 50);
+}
+
+function showResult(data, name){
+    const el = document.getElementById('result-state');
+    if(data.ok){
+        const isNew = data.action === 'enrolled';
+        el.innerHTML=`
+        <div class="result-icon result-ok">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="result-title">${isNew?'Employee Enrolled!':'Employee Updated!'}</div>
+        <div class="result-sub">
+            <strong>${data.name}</strong> ${isNew?'has been added to':'has been updated in'} the system.
+        </div>
+        <div class="result-stats">
+            <div class="rs-item">
+                <div class="rs-n">${data.faces_used}</div>
+                <div class="rs-l">Faces detected</div>
+            </div>
+            <div class="rs-item">
+                <div class="rs-n">${data.images_sent}</div>
+                <div class="rs-l">Images processed</div>
+            </div>
+            <div class="rs-item">
+                <div class="rs-n">${data.total_staff}</div>
+                <div class="rs-l">Total staff</div>
+            </div>
+        </div>`;
+        addFeed(`✅ ${data.name} ${isNew?'enrolled':'updated'} (${data.faces_used} faces)`, 'info');
+    } else {
+        el.innerHTML=`
+        <div class="result-icon result-err">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+        </div>
+        <div class="result-title">Enrollment Failed</div>
+        <div class="result-sub">${data.error||'Unknown error'}</div>`;
+    }
+}
+</script>
+</body>
+</html>
